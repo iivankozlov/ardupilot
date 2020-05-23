@@ -53,7 +53,7 @@ public:
     void takeoff_controller(void);
     void waypoint_controller(void);
 
-    void update_throttle_thr_mix(void);
+    void update_throttle_mix(void);
     
     // update transition handling
     void update(void);
@@ -89,6 +89,7 @@ public:
     bool verify_vtol_land(void);
     bool in_vtol_auto(void) const;
     bool in_vtol_mode(void) const;
+    bool in_vtol_posvel_mode(void) const;
     void update_throttle_hover();
 
     // vtol help for is_flying()
@@ -347,6 +348,7 @@ private:
     
     // timer start for transition
     uint32_t transition_start_ms;
+    float transition_initial_pitch;
     uint32_t transition_low_airspeed_ms;
 
     Location last_auto_target;
@@ -387,6 +389,9 @@ private:
         uint32_t land_start_ms;
         float vpos_start_m;
     } landing_detect;
+
+    // throttle mix acceleration filter
+    LowPassFilterVector3f throttle_mix_accel_ef_filter = LowPassFilterVector3f(1.0f);
 
     // time we last set the loiter target
     uint32_t last_loiter_ms;
@@ -538,6 +543,8 @@ private:
     uint32_t takeoff_start_time_ms;
     uint32_t takeoff_time_limit_ms;
 
+    float last_land_final_agl;
+
     /*
       return true if current mission item is a vtol takeoff
      */
@@ -567,6 +574,11 @@ private:
       are we in the final landing phase of a VTOL landing?
      */
     bool in_vtol_land_final(void) const;
+
+    /*
+      are we in any of the phases of a VTOL landing?
+     */
+    bool in_vtol_land_sequence(void) const;
     
 public:
     void motor_test_output();

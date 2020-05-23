@@ -42,6 +42,7 @@
 #include "AP_RangeFinder_BLPing.h"
 #include "AP_RangeFinder_UAVCAN.h"
 #include "AP_RangeFinder_Lanbao.h"
+#include "AP_RangeFinder_LeddarVu8.h"
 
 #include <AP_BoardConfig/AP_BoardConfig.h>
 #include <AP_Logger/AP_Logger.h>
@@ -87,7 +88,7 @@ const AP_Param::GroupInfo RangeFinder::var_info[] = {
 
     // @Group: 4_
     // @Path: AP_RangeFinder_Wasp.cpp
-    AP_SUBGROUPVARPTR(drivers[0], "4_",  60, RangeFinder, backend_var_info[3]),
+    AP_SUBGROUPVARPTR(drivers[3], "4_",  60, RangeFinder, backend_var_info[3]),
 #endif
 
 #if RANGEFINDER_MAX_INSTANCES > 4
@@ -223,7 +224,7 @@ void RangeFinder::convert_params(void) {
     info.old_key = 53;
 #elif APM_BUILD_TYPE(APM_BUILD_ArduSub)
     info.old_key = 35;
-#elif APM_BUILD_TYPE(APM_BUILD_APMrover2)
+#elif APM_BUILD_TYPE(APM_BUILD_Rover)
     info.old_key = 197;
 #else
     params[0].type.save(true);
@@ -254,10 +255,11 @@ void RangeFinder::convert_params(void) {
  */
 void RangeFinder::init(enum Rotation orientation_default)
 {
-    if (num_instances != 0) {
+    if (init_done) {
         // init called a 2nd time?
         return;
     }
+    init_done = true;
 
     convert_params();
 
@@ -269,11 +271,14 @@ void RangeFinder::init(enum Rotation orientation_default)
     for (uint8_t i=0, serial_instance = 0; i<RANGEFINDER_MAX_INSTANCES; i++) {
         // serial_instance will be increased inside detect_instance
         // if a serial driver is loaded for this instance
+        WITH_SEMAPHORE(detect_sem);
         detect_instance(i, serial_instance);
         if (drivers[i] != nullptr) {
             // we loaded a driver for this instance, so it must be
-            // present (although it may not be healthy)
-            num_instances = i+1;
+            // present (although it may not be healthy). We use MAX()
+            // here as a UAVCAN rangefinder may already have been
+            // found
+            num_instances = MAX(num_instances, i+1);
         }
 
         // initialise status
@@ -496,6 +501,23 @@ void RangeFinder::detect_instance(uint8_t instance, uint8_t& serial_instance)
             drivers[instance] = new AP_RangeFinder_Lanbao(state[instance], params[instance], serial_instance++);
         }
         break;
+    case Type::LeddarVu8_Serial:
+        if (AP_RangeFinder_LeddarVu8::detect(serial_instance)) {
+            drivers[instance] = new AP_RangeFinder_LeddarVu8(state[instance], params[instance], serial_instance++);
+        }
+        break;
+
+#if HAL_WITH_UAVCAN
+    case Type::UAVCAN:
+        /*
+          the UAVCAN driver gets created when we first receive a
+          measurement. We take the instance slot now, even if we don't
+          yet have the driver
+         */
+        num_instances = MAX(num_instances, instance+1);
+        break;
+#endif
+
     default:
         break;
     }
@@ -504,6 +526,9 @@ void RangeFinder::detect_instance(uint8_t instance, uint8_t& serial_instance)
     if (drivers[instance] && state[instance].var_info) {
         backend_var_info[instance] = state[instance].var_info;
         AP_Param::load_object_from_eeprom(drivers[instance], backend_var_info[instance]);
+
+        // param count could have changed
+        AP_Param::invalidate_count();
     }
 }
 

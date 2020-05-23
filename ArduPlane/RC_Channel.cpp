@@ -27,6 +27,11 @@ bool RC_Channels_Plane::has_valid_input() const
     return true;
 }
 
+RC_Channel * RC_Channels_Plane::get_arming_channel(void) const
+{
+    return plane.channel_rudder;
+}
+
 void RC_Channel_Plane::do_aux_function_change_mode(const Mode::Number number,
                                                    const aux_switch_pos_t ch_flag)
 {
@@ -58,12 +63,12 @@ void RC_Channel_Plane::init_aux_function(const RC_Channel::aux_func_t ch_option,
 {
     switch(ch_option) {
     // the following functions do not need to be initialised:
-    case AUX_FUNC::ARMDISARM:
     case AUX_FUNC::AUTO:
     case AUX_FUNC::CIRCLE:
-    case AUX_FUNC::LOITER:
+    case AUX_FUNC::FLAP:
     case AUX_FUNC::GUIDED:
     case AUX_FUNC::INVERTED:
+    case AUX_FUNC::LOITER:
     case AUX_FUNC::MANUAL:
     case AUX_FUNC::RTL:
     case AUX_FUNC::TAKEOFF:
@@ -128,6 +133,8 @@ void RC_Channel_Plane::do_aux_function(const aux_func_t ch_option, const aux_swi
         do_aux_function_change_mode(Mode::Number::TAKEOFF, ch_flag);
         break;
 
+    case AUX_FUNC::FLAP:
+        break; // flap input label, nothing to do
 
     default:
         RC_Channel::do_aux_function(ch_option, ch_flag);

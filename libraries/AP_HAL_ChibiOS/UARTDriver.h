@@ -54,7 +54,7 @@ public:
     bool lock_port(uint32_t write_key, uint32_t read_key) override;
 
     // control optional features
-    bool set_options(uint8_t options) override;
+    bool set_options(uint16_t options) override;
     uint8_t get_options(void) const override;
 
     // write to a locked port. If port is locked and key is not correct then 0 is returned
@@ -72,6 +72,8 @@ public:
         uint8_t dma_tx_stream_id;
         uint32_t dma_tx_channel_id;
 #endif
+        ioline_t tx_line;
+        ioline_t rx_line;
         ioline_t rts_line;
         int8_t rxinv_gpio;
         uint8_t rxinv_polarity;
@@ -157,7 +159,7 @@ private:
 #endif
     ByteBuffer _readbuf{0};
     ByteBuffer _writebuf{0};
-    Semaphore _write_mutex;
+    HAL_Semaphore _write_mutex;
 #ifndef HAL_UART_NODMA
     const stm32_dma_stream_t* rxdma;
     const stm32_dma_stream_t* txdma;
@@ -183,17 +185,20 @@ private:
     uint32_t _first_write_started_us;
     uint32_t _total_written;
 
-    // we remember cr2 and cr2 options from set_options to apply on sdStart()
-    uint32_t _cr3_options;
+    // we remember config options from set_options to apply on sdStart()
+    uint32_t _cr1_options;
     uint32_t _cr2_options;
-    uint8_t _last_options;
+    uint32_t _cr3_options;
+    uint16_t _last_options;
 
     // half duplex control. After writing we throw away bytes for 4 byte widths to
     // prevent reading our own bytes back
+#if CH_CFG_USE_EVENTS == TRUE
     bool half_duplex;
-    uint32_t hd_read_delay_us;
-    uint32_t hd_write_us;
-    void half_duplex_setup_delay(uint16_t len);
+    event_listener_t hd_listener;
+    bool hd_tx_active;
+    void half_duplex_setup_tx(void);
+#endif
 
     // set to true for unbuffered writes (low latency writes)
     bool unbuffered_writes;
@@ -227,6 +232,12 @@ private:
 
     void receive_timestamp_update(void);
 
+    // set SERIALn_OPTIONS for pullup/pulldown
+    void set_pushpull(uint16_t options);
+
     void thread_init();
     static void uart_thread(void *);
 };
+
+// access to usb init for stdio.cpp
+void usb_initialise(void);
