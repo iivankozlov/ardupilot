@@ -186,6 +186,9 @@ public:
     // Write position and quaternion data from an external navigation system
     void writeExtNavData(const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms) override;
 
+    // Write velocity data from an external navigation system
+    void writeExtNavVelData(const Vector3f &vel, float err, uint32_t timeStamp_ms, uint16_t delay_ms) override;
+
     // inhibit GPS usage
     uint8_t setInhibitGPS(void);
 
@@ -245,6 +248,10 @@ public:
     // this is used to limit height during optical flow navigation
     // it will return invalid when no limiting is required
     bool get_hgt_ctrl_limit(float &limit) const override;
+
+    // Set to true if the terrain underneath is stable enough to be used as a height reference
+    // this is not related to terrain following
+    void set_terrain_hgt_stable(bool stable) override;
 
     // get_location - updates the provided location with the latest
     // calculated location including absolute altitude

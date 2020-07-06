@@ -406,6 +406,18 @@ class AutoTestQuadPlane(AutoTest):
             "CPUFailsafe": "servo channel values not scaled like ArduPlane",
         }
 
+    def test_pilot_yaw(self):
+        self.takeoff(10, mode="QLOITER")
+        self.set_parameter("STICK_MIXING", 0)
+        self.set_rc(4, 1700)
+        for mode in "QLOITER", "QHOVER":
+            self.wait_heading(45)
+            self.wait_heading(90)
+            self.wait_heading(180)
+            self.wait_heading(275)
+        self.set_rc(4, 1500)
+        self.do_RTL()
+
     def CPUFailsafe(self):
         '''In lockup Plane should copy RC inputs to RC outputs'''
         self.plane_CPUFailsafe()
@@ -438,10 +450,26 @@ class AutoTestQuadPlane(AutoTest):
                                       timeout=30,
                                       comparator=operator.eq)
         self.set_rc(3, 1500)
+
+        self.context_push()
+        self.progress("Rolling over hard")
+        self.set_rc(1, 1000)
+        self.wait_roll(-65, 5)
+        self.progress("Killing servo outputs to force qassist to help")
+        self.set_parameter("SERVO1_MIN", 1500)
+        self.set_parameter("SERVO1_MAX", 1500)
+        self.set_parameter("SERVO1_TRIM", 1500)
+        self.progress("Trying ot roll over hard the other way")
+        self.set_rc(1, 2000)
+        self.progress("Waiting for qassist (angle) to kick in")
+        self.wait_servo_channel_value(5, 1100, timeout=30, comparator=operator.gt)
+        self.wait_roll(85, 5)
+        self.context_pop()
+
         self.change_mode("RTL")
         self.delay_sim_time(20)
         self.change_mode("QRTL")
-        self.wait_disarmed(timeout=180)
+        self.wait_disarmed(timeout=300)
 
     def tests(self):
         '''return list of all tests'''
@@ -450,9 +478,17 @@ class AutoTestQuadPlane(AutoTest):
         ret.extend([
             ("TestMotorMask", "Test output_motor_mask", self.test_motor_mask),
 
+            ("PilotYaw",
+             "Test pilot yaw in various modes",
+             self.test_pilot_yaw),
+
             ("ParameterChecks",
              "Test Arming Parameter Checks",
              self.test_parameter_checks),
+
+            ("TestLogDownload",
+             "Test Onboard Log Download",
+             self.test_log_download),
 
             ("Mission", "Dalby Mission",
              lambda: self.fly_mission("Dalby-OBC2016.txt", "Dalby-OBC2016-fence.txt")),
